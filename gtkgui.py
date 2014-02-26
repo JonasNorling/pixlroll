@@ -1,3 +1,4 @@
+from __future__ import division
 import gtk
 import cairo
 
@@ -5,7 +6,8 @@ class PlotWidget(gtk.DrawingArea):
     def __init__(self, w, h):
         gtk.DrawingArea.__init__(self)
         self.plotsize = (w, h)
-        self.backgroundcolor = (0.9, 0.3, 0.3, 1)
+        self.size = (1000, 1000)
+        self.backgroundcolor = (0.3, 0.3, 0.3, 1)
         self.connect("expose-event", self.on_expose_event)
         self.connect("configure-event", self.on_configure_event)
         self.connect("realize", self.on_realize)
@@ -32,13 +34,28 @@ class PlotWidget(gtk.DrawingArea):
     def on_expose_event(self, widget, event):
         """Blit out the backbuffer"""
         winctx = self.window.cairo_create()
+        winctx.save()
+        winctx.scale(self.size[0] / self.plotsize[0], self.size[1] / self.plotsize[1])
         winctx.set_source_surface(self.plotbuffer)
         winctx.paint()
+        winctx.restore()
+
+    def getColor(self, v):
+        g = (128+v) / 128.0
+        r = 0
+        b = 0
+        if v >= -100:
+            r = 0.3
+        if v > -96:
+            r = 0.6
+        if v > -70:
+            b = 0.5
+        return (r, g, b)
 
     def addData(self, values):
         for v in values:
             self.ctx.rectangle(self.x, self.y, 1, 1)
-            self.ctx.set_source_rgb(0, v/256.0, 0)
+            self.ctx.set_source_rgb(*self.getColor(v))
             self.ctx.fill()
 
             self.x += 1
@@ -49,13 +66,17 @@ class PlotWidget(gtk.DrawingArea):
                 #self.ctx.set_source_surface(self.plotbuffer)
                 #self.ctx.paint()
                 self.y += 1
+                self.y %= self.plotsize[1]
+                self.ctx.rectangle(0, self.y, self.plotsize[0], 10)
+                self.ctx.set_source_rgba(*self.backgroundcolor)
+                self.ctx.fill()
         
         self.queue_draw()
 
 class PlotWindow(gtk.Window):
-    def __init__(self, plotWidget):
+    def __init__(self, plotWidget, w, h):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
-        self.set_default_size(800, 480);
+        self.set_default_size(w, h);
         self.connect("destroy", self.quit_callback)
 
         mainBox = gtk.HBox()
@@ -72,7 +93,7 @@ class PlotWindow(gtk.Window):
 class Gui(object):
     def __init__(self, w, h):
         self.plotwidget = PlotWidget(w, h)
-        self.plotwin = PlotWindow(self.plotwidget)
+        self.plotwin = PlotWindow(self.plotwidget, w, h)
     
     def getPlotter(self):
         return self.plotwidget
