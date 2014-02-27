@@ -9,15 +9,14 @@ class PlotWidget(gtk.DrawingArea):
         self.plotsize = (w, h)
         self.size = (1000, 1000)
         self.bottommargin = 20
+        self.legendsize = 10
         self.backgroundcolor = (0.0, 0.0, 0.0, 1)
-        self.fillcolor = (0.0, 0.0, 0.0, 0.3)
         self.connect("expose-event", self.on_expose_event)
         self.connect("configure-event", self.on_configure_event)
         self.connect("realize", self.on_realize)
         self.plotbuffer = None
         self.ctx = None
         self.x = 0
-        self.y = 0
 
         self.colormap = self.makeColormap()
 
@@ -42,7 +41,7 @@ class PlotWidget(gtk.DrawingArea):
             self.ctx = cairo.Context(self.plotbuffer)
             self.ctx.set_source_rgba(*self.backgroundcolor)
             self.ctx.paint()
-            
+
     def on_configure_event(self, widget, event):
         self.size = (event.width, event.height)
         self.on_realize(widget)
@@ -50,6 +49,8 @@ class PlotWidget(gtk.DrawingArea):
     def on_expose_event(self, widget, event):
         """Blit out the backbuffer"""
         winctx = self.window.cairo_create()
+        winctx.set_source_rgba(*self.backgroundcolor)
+        winctx.paint()
         winctx.save()
         winctx.scale(self.size[0] / self.plotsize[0], (self.size[1]-self.bottommargin) / self.plotsize[1])
         winctx.set_source_surface(self.plotbuffer)
@@ -60,13 +61,13 @@ class PlotWidget(gtk.DrawingArea):
         for v in range(-128, 128):
             x = v + 128
             w = self.size[0]/255.0
-            winctx.rectangle(x * w, self.size[1]-self.bottommargin, w + 1, self.bottommargin)
+            winctx.rectangle(x * w, self.size[1]-self.legendsize, w + 1, self.legendsize)
             winctx.set_source_rgb(*self.colormap[v])
             winctx.fill()
 
     def addData(self, values):
         for v in values:
-            self.ctx.rectangle(self.x, self.y, 1, 1)
+            self.ctx.rectangle(self.x, self.plotsize[1]-1, 1, 1)
             self.ctx.set_source_rgb(*self.colormap[v])
             self.ctx.fill()
 
@@ -74,14 +75,14 @@ class PlotWidget(gtk.DrawingArea):
             if self.x >= self.plotsize[0]:
                 self.x = 0
 
-                # FIXME: Scroll contents
-                #self.ctx.set_source_surface(self.plotbuffer)
-                #self.ctx.paint()
-                self.y += 1
-                self.y %= self.plotsize[1]
-                self.ctx.rectangle(0, self.y, self.plotsize[0], 10)
-                self.ctx.set_source_rgba(*self.fillcolor)
+                # Scroll contents
                 self.ctx.fill()
+                self.ctx.set_source_surface(self.plotbuffer, 0, -1)
+                self.ctx.paint()
+                self.ctx.rectangle(0, self.plotsize[1]-1, self.plotsize[0], 1)
+                self.ctx.set_source_rgba(*self.backgroundcolor)
+
+                # Update window when a new line has been drawn
                 self.queue_draw()
 
 class PlotWindow(gtk.Window):
