@@ -8,12 +8,13 @@
 from __future__ import division
 import gtk
 import cairo
-import colorsys
 
 class PlotWidget(gtk.DrawingArea):
-    def __init__(self, w, h):
+    def __init__(self, w, h, colormap, datarange):
         gtk.DrawingArea.__init__(self)
         self.plotsize = (w, h)
+        self.colormap = colormap
+        self.datarange = datarange
         self.size = (1000, 1000)
         self.bottommargin = 20
         self.legendsize = 10
@@ -24,19 +25,6 @@ class PlotWidget(gtk.DrawingArea):
         self.plotbuffer = None
         self.ctx = None
         self.x = 0
-
-        self.colormap = self.makeColormap()
-
-    def makeColormap(self):
-        c = {}
-        for v in range(-128, 128):
-            n = (v + 128) / 256.0 # n: 0..1
-            if v >= -100 and v < -20:
-                s = 1.0
-            else:
-                s = 0.0
-            c[v] = colorsys.hsv_to_rgb(n - 0.1, s, n * 3)
-        return c
 
     def on_realize(self, widget=None):
         self.realized = True
@@ -65,9 +53,9 @@ class PlotWidget(gtk.DrawingArea):
         winctx.restore()
 
         # Draw a legend
-        for v in range(-128, 128):
-            x = v + 128
-            w = self.size[0]/255.0
+        w = self.size[0] / (self.datarange[1] - self.datarange[0])
+        for v in range(*self.datarange):
+            x = v - self.datarange[0]
             winctx.rectangle(x * w, self.size[1]-self.legendsize, w + 1, self.legendsize)
             winctx.set_source_rgb(*self.colormap[v])
             winctx.fill()
@@ -110,8 +98,8 @@ class PlotWindow(gtk.Window):
 
 
 class Gui(object):
-    def __init__(self, w, h):
-        self.plotwidget = PlotWidget(w, h)
+    def __init__(self, w, h, colormap, datarange):
+        self.plotwidget = PlotWidget(w, h, colormap, datarange)
         self.plotwin = PlotWindow(self.plotwidget, w, h)
     
     def getPlotter(self):
