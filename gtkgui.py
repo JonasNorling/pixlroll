@@ -54,11 +54,27 @@ class PlotWidget(gtk.DrawingArea):
 
         # Draw a legend
         w = self.size[0] / (self.datarange[1] - self.datarange[0])
+        tick = 10
+
+        winctx.save()
+        winctx.translate(0, self.size[1] - self.legendsize)
         for v in range(*self.datarange):
             x = v - self.datarange[0]
-            winctx.rectangle(x * w, self.size[1]-self.legendsize, w + 1, self.legendsize)
+            winctx.rectangle(x * w, 0, w + 1, self.legendsize)
             winctx.set_source_rgb(*self.colormap[v])
             winctx.fill()
+
+            if v % tick == 0:
+                winctx.move_to(int(x * w + w/2), 0)
+                winctx.line_to(int(x * w + w/2), self.legendsize / 2)
+                winctx.set_source_rgb(1, 1, 1)
+
+                text = "%d" % v
+                extents = winctx.text_extents(text)
+                winctx.move_to(int(x * w + w/2) - extents[2]/2, -1)
+                winctx.show_text(text)
+                winctx.stroke()
+        winctx.restore()
 
     def addData(self, values):
         for v in values:
@@ -78,7 +94,7 @@ class PlotWidget(gtk.DrawingArea):
                 self.ctx.set_source_rgba(*self.backgroundcolor)
 
                 # Update window when a new line has been drawn
-                self.queue_draw()
+                self.queue_draw_area(0, 0, self.size[0], self.size[1] - self.bottommargin)
 
 class PlotWindow(gtk.Window):
     def __init__(self, plotWidget, w, h):
