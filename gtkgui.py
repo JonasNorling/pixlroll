@@ -1,3 +1,10 @@
+#!/usr/bin/python
+#
+# Copyright 2014, Jonas Norling <jonas.norling@gmail.com>
+#
+# This software program is licensed under the GNU General Public License v2.
+#
+
 from __future__ import division
 import gtk
 import cairo

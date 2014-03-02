@@ -12,7 +12,7 @@ import gtk
 import struct
 
 description=\
-"Spectrogramophone draws a scrolling spectrogram plot of realtime data"
+"Pixlroll draws a scrolling intensity plot of one-dimensional realtime data"
 
 blocksize = 0
 plotter = None
