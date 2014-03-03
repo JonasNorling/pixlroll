@@ -8,6 +8,7 @@
 from __future__ import division
 import optparse
 from gtkgui import Gui
+from histogram import Histogram
 import gtk
 import struct
 import colorsys
@@ -17,6 +18,7 @@ description=\
 
 blocksize = 0
 plotter = None
+histogram = None
 typesize = 1
 typestring = None
 
@@ -26,6 +28,8 @@ def readable(fd, condition):
     count = len(data) / typesize
     values = struct.unpack(typestring % count, data)
     plotter.addData(values)
+    if histogram:
+        histogram.addData(values)
     return True
 
 def makeColormap(datarange, colormap):
@@ -54,6 +58,8 @@ if __name__ == '__main__':
                       help="Plot height [pixels]", metavar="N")
     parser.add_option("--colormap", dest="colormap", metavar="NAME",
                       help="Color palette: rainbow, rssi", default="rainbow")
+    parser.add_option("--histogram", dest="histogram", metavar="N", type="int",
+                      help="Draw a cumulative histogram of last N data samples")
 
     group = optparse.OptionGroup(parser, "Sample options")
     group.add_option("--blocksize", dest="blocksize", default=1000, type="int",
@@ -72,6 +78,9 @@ if __name__ == '__main__':
     infile = open(args[0])
     blocksize = options.blocksize
     
+    if options.histogram:
+        histogram = Histogram(options.histogram)
+    
     if options.type == "uint8":
         typestring = "@%dB"
         datarange = (0, 255)
@@ -83,7 +92,7 @@ if __name__ == '__main__':
     
     # Set up the GUI, register a watch on the FIFO, kickstart things
     colormap = makeColormap(datarange, options.colormap)
-    gui = Gui(options.width, options.height, colormap, datarange)
+    gui = Gui(options.width, options.height, colormap, datarange, histogram)
     plotter = gui.getPlotter()
     gtk.input_add(infile, gtk.gdk.INPUT_READ, readable)
     gui.run()

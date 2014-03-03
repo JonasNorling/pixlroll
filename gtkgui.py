@@ -10,14 +10,18 @@ import gtk
 import cairo
 
 class PlotWidget(gtk.DrawingArea):
-    def __init__(self, w, h, colormap, datarange):
+    def __init__(self, w, h, colormap, datarange, histogram=None):
         gtk.DrawingArea.__init__(self)
         self.plotsize = (w, h)
         self.colormap = colormap
         self.datarange = datarange
+        self.histogram = histogram
         self.size = (1000, 1000)
-        self.bottommargin = 20
-        self.legendsize = 10
+        self.legendsize = 20
+        self.histogramsize = 200
+        self.bottommargin = self.legendsize
+        if histogram:
+            self.bottommargin += self.histogramsize
         self.backgroundcolor = (0.0, 0.0, 0.0, 1)
         self.connect("expose-event", self.on_expose_event)
         self.connect("configure-event", self.on_configure_event)
@@ -58,22 +62,42 @@ class PlotWidget(gtk.DrawingArea):
 
         winctx.save()
         winctx.translate(0, self.size[1] - self.legendsize)
+        textheight = 10
+        legendheight = self.legendsize - textheight
+
         for v in range(*self.datarange):
             x = v - self.datarange[0]
-            winctx.rectangle(x * w, 0, w + 1, self.legendsize)
+            winctx.rectangle(x * w, textheight, w + 1, legendheight)
             winctx.set_source_rgb(*self.colormap[v])
             winctx.fill()
 
             if v % tick == 0:
-                winctx.move_to(int(x * w + w/2), 0)
-                winctx.line_to(int(x * w + w/2), self.legendsize / 2)
+                winctx.move_to(int(x * w + w/2), legendheight)
+                winctx.line_to(int(x * w + w/2), legendheight * 1.5)
                 winctx.set_source_rgb(1, 1, 1)
 
                 text = "%d" % v
                 extents = winctx.text_extents(text)
-                winctx.move_to(int(x * w + w/2) - extents[2]/2, -1)
+                winctx.move_to(int(x * w + w/2) - extents[2]/2, legendheight - 1)
                 winctx.show_text(text)
                 winctx.stroke()
+
+        # Draw histogram
+        if self.histogram:
+            hist = self.histogram.calculate(self.datarange)
+            
+            winctx.set_source_rgba(0.6, 0.6, 1.0, 0.3)
+            for v in range(0, 10):
+                winctx.move_to(0, -0.1 * v * self.histogramsize)
+                winctx.line_to(self.size[0], -0.1 * v * self.histogramsize)
+            winctx.stroke()
+            
+            for v in range(*self.datarange):
+                winctx.set_source_rgb(*self.colormap[v])
+                x = v - self.datarange[0]
+                winctx.rectangle(x * w, 0, w*0.8, - hist[x] * self.histogramsize)
+                winctx.fill()
+
         winctx.restore()
 
     def addData(self, values):
@@ -94,7 +118,7 @@ class PlotWidget(gtk.DrawingArea):
                 self.ctx.set_source_rgba(*self.backgroundcolor)
 
                 # Update window when a new line has been drawn
-                self.queue_draw_area(0, 0, self.size[0], self.size[1] - self.bottommargin)
+                self.queue_draw_area(0, 0, self.size[0], self.size[1] - self.legendsize)
 
 class PlotWindow(gtk.Window):
     def __init__(self, plotWidget, w, h):
@@ -114,8 +138,8 @@ class PlotWindow(gtk.Window):
 
 
 class Gui(object):
-    def __init__(self, w, h, colormap, datarange):
-        self.plotwidget = PlotWidget(w, h, colormap, datarange)
+    def __init__(self, w, h, colormap, datarange, histogram=None):
+        self.plotwidget = PlotWidget(w, h, colormap, datarange, histogram)
         self.plotwin = PlotWindow(self.plotwidget, w, h)
     
     def getPlotter(self):
