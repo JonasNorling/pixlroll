@@ -60,6 +60,8 @@ if __name__ == '__main__':
                       help="Color palette: rainbow, rssi", default="rainbow")
     parser.add_option("--histogram", dest="histogram", metavar="N", type="int",
                       help="Draw a cumulative histogram of last N data samples")
+    parser.add_option("--timestamps", dest="timestamps", action="store_true",
+                      help="Draw timestamps in the margin")
 
     group = optparse.OptionGroup(parser, "Sample options")
     group.add_option("--blocksize", dest="blocksize", default=1000, type="int",
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     
     # Set up the GUI, register a watch on the FIFO, kickstart things
     colormap = makeColormap(datarange, options.colormap)
-    gui = Gui(options.width, options.height, colormap, datarange, histogram)
+    gui = Gui(options.width, options.height, colormap, datarange, histogram, options.timestamps)
     plotter = gui.getPlotter()
     gtk.input_add(infile, gtk.gdk.INPUT_READ, readable)
     gui.run()

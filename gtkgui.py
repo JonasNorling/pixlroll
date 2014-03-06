@@ -8,20 +8,31 @@
 from __future__ import division
 import gtk
 import cairo
+import time
 
 class PlotWidget(gtk.DrawingArea):
-    def __init__(self, w, h, colormap, datarange, histogram=None):
+    def __init__(self, w, h, colormap, datarange, histogram=None, timestamps=False):
         gtk.DrawingArea.__init__(self)
-        self.plotsize = (w, h)
         self.colormap = colormap
         self.datarange = datarange
         self.histogram = histogram
-        self.size = (1000, 1000)
+        self.timestamps = timestamps
+        self.timestampInterval = 60
+        self.lastTimestamp = (int(time.time()) // 60) * 60
+
         self.legendsize = 20
         self.histogramsize = 200
         self.bottommargin = self.legendsize
+        self.rightmargin = 0
+
         if histogram:
             self.bottommargin += self.histogramsize
+        if timestamps:
+            self.rightmargin += 250
+
+        self.plotsize = (w, h)
+        self.size = (w + self.rightmargin, h + self.bottommargin)
+
         self.backgroundcolor = (0.0, 0.0, 0.0, 1)
         self.connect("expose-event", self.on_expose_event)
         self.connect("configure-event", self.on_configure_event)
@@ -30,13 +41,16 @@ class PlotWidget(gtk.DrawingArea):
         self.ctx = None
         self.x = 0
 
+    def get_size(self):
+        return self.size
+
     def on_realize(self, widget=None):
         self.realized = True
         winctx = self.window.cairo_create()
         
         if self.plotbuffer is None:
             self.plotbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
-                                                                 self.plotsize[0], self.plotsize[1])
+                                                                 self.plotsize[0] + self.rightmargin, self.plotsize[1])
             self.ctx = cairo.Context(self.plotbuffer)
             self.ctx.set_source_rgba(*self.backgroundcolor)
             self.ctx.paint()
@@ -51,7 +65,8 @@ class PlotWidget(gtk.DrawingArea):
         winctx.set_source_rgba(*self.backgroundcolor)
         winctx.paint()
         winctx.save()
-        winctx.scale(self.size[0] / self.plotsize[0], (self.size[1]-self.bottommargin) / self.plotsize[1])
+        winctx.scale(self.size[0] / (self.plotsize[0] + self.rightmargin),
+                     (self.size[1] - self.bottommargin) / self.plotsize[1])
         winctx.set_source_surface(self.plotbuffer)
         winctx.paint()
         winctx.restore()
@@ -72,6 +87,7 @@ class PlotWidget(gtk.DrawingArea):
             winctx.fill()
 
             if v % tick == 0:
+                winctx.set_line_width(1.0)
                 winctx.move_to(int(x * w + w/2), legendheight)
                 winctx.line_to(int(x * w + w/2), legendheight * 1.5)
                 winctx.set_source_rgb(1, 1, 1)
@@ -80,7 +96,6 @@ class PlotWidget(gtk.DrawingArea):
                 extents = winctx.text_extents(text)
                 winctx.move_to(int(x * w + w/2) - extents[2]/2, legendheight - 1)
                 winctx.show_text(text)
-                winctx.stroke()
 
         # Draw histogram
         if self.histogram:
@@ -88,9 +103,9 @@ class PlotWidget(gtk.DrawingArea):
             
             winctx.set_source_rgba(0.6, 0.6, 1.0, 0.3)
             for v in range(0, 10):
-                winctx.move_to(0, -0.1 * v * self.histogramsize)
-                winctx.line_to(self.size[0], -0.1 * v * self.histogramsize)
-            winctx.stroke()
+                winctx.rectangle(0, -0.1 * v * self.histogramsize,
+                                 self.size[0], 1)
+            winctx.fill()
             
             for v in range(*self.datarange):
                 winctx.set_source_rgb(*self.colormap[v])
@@ -111,11 +126,26 @@ class PlotWidget(gtk.DrawingArea):
                 self.x = 0
 
                 # Scroll contents
-                self.ctx.fill()
                 self.ctx.set_source_surface(self.plotbuffer, 0, -1)
                 self.ctx.paint()
-                self.ctx.rectangle(0, self.plotsize[1]-1, self.plotsize[0], 1)
                 self.ctx.set_source_rgba(*self.backgroundcolor)
+                self.ctx.rectangle(0, self.plotsize[1]-1, self.plotsize[0] + self.rightmargin, 1)
+                self.ctx.fill()
+
+                # Draw timestamps
+                if self.timestamps:
+                    now = time.time()
+                    if now >= self.lastTimestamp + self.timestampInterval:
+                        self.lastTimestamp += self.timestampInterval
+                        self.ctx.set_source_rgb(1.0, 1.0, 1.0)
+                        self.ctx.set_line_width(1.0)
+                        self.ctx.rectangle(self.plotsize[0] + 1, self.plotsize[1] - 1,
+                                           self.rightmargin, 1)
+                        self.ctx.fill()
+
+                        text = "%s (%d)" % (time.ctime(now), int(now))
+                        self.ctx.move_to(self.plotsize[0] + 20, self.plotsize[1] - 2)
+                        self.ctx.show_text(text)
 
                 # Update window when a new line has been drawn
                 self.queue_draw_area(0, 0, self.size[0], self.size[1] - self.legendsize)
@@ -138,16 +168,17 @@ class PlotWindow(gtk.Window):
 
 
 class Gui(object):
-    def __init__(self, w, h, colormap, datarange, histogram=None):
-        self.plotwidget = PlotWidget(w, h, colormap, datarange, histogram)
+    def __init__(self, w, h, colormap, datarange, histogram=None, timestamps=False):
+        self.plotwidget = PlotWidget(w, h, colormap, datarange, histogram, timestamps)
+        w, h = self.plotwidget.get_size()
         self.plotwin = PlotWindow(self.plotwidget, w, h)
-    
+
     def getPlotter(self):
         return self.plotwidget
-    
+
     def run(self):
         self.plotwin.show_all()
-    
+
         try:
             gtk.main()
         except KeyboardInterrupt:
