@@ -12,6 +12,8 @@ from histogram import Histogram
 import gtk
 import struct
 import colorsys
+import fcntl
+import os
 
 description=\
 "Pixlroll draws a scrolling intensity plot of one-dimensional realtime data"
@@ -78,6 +80,7 @@ if __name__ == '__main__':
         parser.error("Supply a FIFO or device filename")
 
     infile = open(args[0])
+    fcntl.fcntl(infile, fcntl.F_SETFL, os.O_NONBLOCK)
     blocksize = options.blocksize
     
     if options.histogram:
